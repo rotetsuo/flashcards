@@ -26,8 +26,13 @@ O que você escolheu estudar e o que já marcou como "já sei" ficam salvos na s
 6. Clique em **Implantar**, autorize o acesso à planilha (o Google mostra "app não verificado": clique em *Avançado → Acessar (não seguro)*; é seu próprio script).
 7. Copie a URL que termina em `/exec`. Esse é o seu app.
 
+### Endereço curto
+
+**https://rotetsuo.github.io/flashcards** redireciona para o app (página em [docs/index.html](docs/index.html), publicada pelo GitHub Pages).
+Se publicar uma implantação com URL nova, troque `APP_URL` nesse arquivo e faça push.
+
 ### No celular
-Abra a URL `/exec` no navegador logado na sua conta Google e use **Compartilhar → Adicionar à Tela de Início** (iPhone) ou **⋮ → Adicionar à tela inicial** (Android).
+Abra **https://rotetsuo.github.io/flashcards#instalar** (com `#instalar` a página não redireciona) e use **Compartilhar → Adicionar à Tela de Início** (iPhone) ou **⋮ → Adicionar à tela inicial** (Android). O ícone abre direto o app; o navegador precisa estar logado na sua conta Google.
 
 ## Uso
 
