@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flashcards</title>
+<style>
+  :root {
+    --bg: #f4f2ee; --surface: #ffffff; --surface-2: #ebe8e2; --text: #1d1b18; --muted: #6e6a63;
+    --line: #dcd8d0; --accent: #2f5bd3; --accent-soft: #e3e9fb; --good: #1f8a52; --good-soft: #def3e7;
+    --bad: #c2412d; --bad-soft: #f9e2dd; --shadow: 0 10px 30px rgba(30, 25, 15, .10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141414; --surface: #1f1f1f; --surface-2: #2a2a2a; --text: #ecebe8; --muted: #9b9890;
+      --line: #333; --accent: #7d9cff; --accent-soft: #232c45; --good: #4cc488; --good-soft: #1b3326;
+      --bad: #ff8a73; --bad-soft: #3a211c; --shadow: 0 10px 30px rgba(0,0,0,.45);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .app { max-width: 640px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column;
+         padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: center; gap: 8px; padding: 4px 0 12px; }
+  header h1 { font-size: 18px; margin: 0; flex: 1; letter-spacing: -.01em; }
+  .icon-btn { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 10px;
+              height: 38px; min-width: 38px; padding: 0 10px; font-size: 14px; cursor: pointer; }
+  .icon-btn:active { transform: scale(.97); }
+  .tabs { display: flex; gap: 6px; background: var(--surface-2); padding: 4px; border-radius: 12px; margin-bottom: 14px; }
+  .tabs button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 8px; border-radius: 9px;
+                 font-size: 14px; font-weight: 600; cursor: pointer; }
+  .tabs button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .view { display: none; flex: 1; flex-direction: column; }
+  .view.active { display: flex; }
+
+  /* Estudo */
+  .stats { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .bar { height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin-bottom: 16px; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--good); transition: width .3s; }
+  .scene { perspective: 1200px; flex: 1; min-height: 300px; max-height: 460px; display: flex; touch-action: pan-y; }
+  .card { position: relative; width: 100%; flex: 1; transform-style: preserve-3d; transition: transform .45s cubic-bezier(.2,.7,.2,1);
+          cursor: pointer; user-select: none; }
+  .card.flipped { transform: rotateY(180deg); }
+  .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+          background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow);
+          display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px 24px; text-align: center; overflow: auto; }
+  .face.back { transform: rotateY(180deg); background: var(--accent-soft); }
+  .face .label { position: absolute; top: 14px; left: 18px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .face .num { position: absolute; top: 14px; right: 18px; font-size: 12px; color: var(--muted); }
+  .face .main { font-size: clamp(22px, 6vw, 34px); font-weight: 700; letter-spacing: -.01em; word-break: break-word; }
+  .face.back .main { font-size: clamp(17px, 4.6vw, 22px); font-weight: 500; white-space: pre-wrap; }
+  .extra { margin-top: 18px; width: 100%; text-align: left; display: flex; flex-direction: column; gap: 10px; }
+  .extra:empty { display: none; }
+  .extra div { font-size: 14px; border-top: 1px solid var(--line); padding-top: 10px; white-space: pre-wrap; }
+  .extra b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 2px; font-weight: 600; }
+  .cat-pill { display: inline-block; margin-top: 14px; font-size: 12px; padding: 3px 10px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
+  .cat-pill:empty { display: none; }
+  .face .hint { position: absolute; bottom: 14px; font-size: 12px; color: var(--muted); }
+  .card.swipe-left { transform: translateX(-120%) rotate(-8deg); opacity: 0; transition: transform .25s, opacity .25s; }
+  .card.swipe-right { transform: translateX(120%) rotate(8deg); opacity: 0; transition: transform .25s, opacity .25s; }
+  .card.flipped.swipe-left { transform: translateX(-120%) rotateY(180deg) rotate(8deg); }
+  .card.flipped.swipe-right { transform: translateX(120%) rotateY(180deg) rotate(-8deg); }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .btn { border: 0; border-radius: 14px; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .btn:active { transform: scale(.98); }
+  .btn.bad { background: var(--bad-soft); color: var(--bad); }
+  .btn.good { background: var(--good-soft); color: var(--good); }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.ghost { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+  .sub-actions { display: flex; justify-content: center; gap: 18px; margin-top: 12px; }
+  .link { background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer; text-decoration: underline; }
+  .done { text-align: center; margin: auto; padding: 24px; }
+  .done h2 { margin: 0 0 6px; }
+  .done p { color: var(--muted); margin: 0 0 18px; }
+
+  /* Configurações */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .panel h3 { margin: 0 0 10px; font-size: 15px; }
+  .seg { display: flex; gap: 6px; margin-bottom: 12px; }
+  .seg label { flex: 1; text-align: center; border: 1px solid var(--line); border-radius: 10px; padding: 9px 6px; font-size: 14px; cursor: pointer; }
+  .seg input { display: none; }
+  .seg input:checked + span { color: var(--accent); font-weight: 700; }
+  .seg label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .row input[type=number] { width: 90px; }
+  input[type=number], input[type=search] { font: inherit; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line);
+         background: var(--bg); color: var(--text); }
+  input[type=search] { width: 100%; }
+  .toggle { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 15px; cursor: pointer; }
+  .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .list { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; }
+  .item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .item:last-child { border-bottom: 0; }
+  .item input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+  .item .t { font-weight: 600; }
+  .item .m { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .item .n { color: var(--muted); font-size: 12px; min-width: 28px; margin-top: 2px; }
+  .item .k { font-size: 11px; color: var(--good); font-weight: 700; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 99px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .sticky-save { position: sticky; bottom: 0; padding-top: 8px; background: linear-gradient(transparent, var(--bg) 30%); }
+  .sticky-save .btn { width: 100%; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(100px); background: var(--text); color: var(--bg);
+           padding: 10px 16px; border-radius: 12px; font-size: 14px; transition: transform .25s; z-index: 10; max-width: calc(100% - 32px); }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .loading { margin: auto; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>📚 Flashcards</h1>
+    <button class="icon-btn" id="refreshBtn" title="Atualizar da planilha">↻ Atualizar</button>
+  </header>
+
+  <nav class="tabs">
+    <button data-view="study" class="active">Estudar</button>
+    <button data-view="settings">Escolher palavras</button>
+  </nav>
+
+  <!-- ESTUDO -->
+  <section class="view active" id="view-study">
+    <div class="loading" id="loading">Carregando a planilha…</div>
+    <div id="studyArea" style="display:none; flex:1; flex-direction:column;">
+      <div class="stats"><span id="statLeft"></span><span id="statKnown"></span></div>
+      <div class="bar"><i id="barFill"></i></div>
+      <div class="scene" id="scene">
+        <div class="card" id="card">
+          <div class="face front">
+            <span class="label" id="frontLabel">Termo</span><span class="num" id="frontNum"></span>
+            <div class="main" id="frontText"></div>
+            <span class="cat-pill" id="frontCat"></span>
+            <span class="hint">toque para virar</span>
+          </div>
+          <div class="face back">
+            <span class="label" id="backLabel">Significado</span><span class="num" id="backNum"></span>
+            <div class="main" id="backText"></div>
+            <div class="extra" id="backExtra"></div>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn bad" id="againBtn">✗ Ainda não sei</button>
+        <button class="btn good" id="knowBtn">✓ Já sei</button>
+      </div>
+      <div class="sub-actions">
+        <button class="link" id="shuffleBtn">Embaralhar de novo</button>
+        <button class="link" id="skipBtn">Pular</button>
+      </div>
+    </div>
+    <div class="done" id="doneArea" style="display:none;">
+      <h2 id="doneTitle">🎉 Rodada concluída!</h2>
+      <p id="doneText"></p>
+      <button class="btn primary" id="restartBtn">Nova rodada</button>
+    </div>
+  </section>
+
+  <!-- CONFIGURAÇÕES -->
+  <section class="view" id="view-settings">
+    <div class="panel">
+      <h3>Quais palavras entram nos cards?</h3>
+      <div class="seg">
+        <label><input type="radio" name="mode" value="range"><span>Intervalo</span></label>
+        <label><input type="radio" name="mode" value="custom"><span>Escolher uma a uma</span></label>
+      </div>
+      <div id="rangeBox">
+        <div class="row">
+          <span>Da palavra</span><input type="number" id="fromInput" min="1">
+          <span>até</span><input type="number" id="toInput" min="1">
+        </div>
+        <div class="chips">
+          <button class="chip" data-range="1-50">1–50</button>
+          <button class="chip" data-range="51-100">51–100</button>
+          <button class="chip" data-range="1-100">1–100</button>
+          <button class="chip" data-range="all">Todas</button>
+        </div>
+        <p class="muted" id="rangeInfo"></p>
+      </div>
+      <div id="customBox" style="display:none;">
+        <input type="search" id="searchInput" placeholder="Buscar termo ou significado…">
+        <div class="chips">
+          <button class="chip" id="selVisible">Marcar visíveis</button>
+          <button class="chip" id="unselVisible">Desmarcar visíveis</button>
+          <button class="chip" id="fromRange">Copiar do intervalo</button>
+        </div>
+        <p class="muted" style="margin-bottom:0">Marcar por categoria:</p>
+        <div class="chips" id="catChips"></div>
+        <p class="muted" id="customInfo"></p>
+        <div class="list" id="termList"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Opções</h3>
+      <label class="toggle"><input type="checkbox" id="reverseInput"> Mostrar o significado na frente</label>
+      <label class="toggle"><input type="checkbox" id="includeKnownInput"> Incluir palavras que já marquei como "sei"</label>
+      <label class="toggle"><input type="checkbox" id="skipEmptyInput"> Pular palavras ainda sem definição na planilha</label>
+      <p class="muted" id="knownInfo"></p>
+      <button class="chip" id="resetKnownBtn">Zerar progresso ("já sei")</button>
+    </div>
+
+    <div class="sticky-save"><button class="btn primary" id="saveBtn">Salvar e estudar</button></div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  // ---------- Ponte com o servidor (Apps Script) — com dados de exemplo fora dele ----------
+  const isGAS = typeof google !== 'undefined' && google.script && google.script.run;
+  const mock = {
+    settings: { mode: 'range', from: 1, to: 50, custom: [], reverse: false, includeKnown: true, skipEmpty: true },
+    known: [],
+    terms: Array.from({ length: 120 }, (_, i) => ({ n: i + 1, id: String(i + 1), term: 'Termo ' + (i + 1),
+      category: ['Bancario', 'Engenharia de Software', ''][i % 3], meaning: i < 70 ? 'Significado de exemplo do termo ' + (i + 1) + '.' : '',
+      where: i % 2 ? 'Módulo a ser desenvolvido' : '', example: i % 5 === 0 ? 'Exemplo de uso.' : '' }))
+  };
+  function call(fn) {
+    const args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      if (isGAS) {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn].apply(null, args);
+        return;
+      }
+      setTimeout(function () {
+        if (fn === 'loadData') resolve(JSON.parse(JSON.stringify(Object.assign({ updatedAt: new Date().toISOString() }, mock))));
+        else if (fn === 'saveSettings') { mock.settings = args[0]; resolve(args[0]); }
+        else if (fn === 'setKnown') { const s = new Set(mock.known); args[1] ? s.add(args[0]) : s.delete(args[0]); mock.known = [...s]; resolve(mock.known); }
+        else if (fn === 'resetKnown') { mock.known = []; resolve([]); }
+      }, 150);
+    });
+  }
+
+  // ---------- Estado ----------
+  let terms = [], settings = null, known = new Set();
+  let deck = [], current = null, total = 0, learnedThisRound = 0;
+  let draft = null; // configurações em edição
+
+  const $ = (id) => document.getElementById(id);
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200); }
+
+  function selectedTerms(s) {
+    s = s || settings;
+    if (s.mode === 'custom') { const set = new Set(s.custom); return terms.filter(t => set.has(t.term)); }
+    return terms.filter(t => t.n >= s.from && t.n <= s.to);
+  }
+  // o que realmente vira card: selecionadas, menos as sem definição (se a opção estiver ligada)
+  function studyable(s) {
+    s = s || settings;
+    const sel = selectedTerms(s);
+    return s.skipEmpty ? sel.filter(t => t.meaning) : sel;
+  }
+
+  // ---------- Carregar ----------
+  function load(showToast) {
+    $('loading').style.display = ''; $('studyArea').style.display = 'none'; $('doneArea').style.display = 'none';
+    $('loading').textContent = 'Carregando a planilha…';
+    return call('loadData').then(function (d) {
+      terms = d.terms; settings = d.settings; known = new Set(d.known);
+      $('loading').style.display = 'none';
+      newRound();
+      if (showToast) toast(terms.length + ' termos carregados da planilha');
+    }).catch(function (e) {
+      $('loading').textContent = 'Erro ao ler a planilha: ' + (e && e.message ? e.message : e);
+    });
+  }
+
+  // ---------- Rodada ----------
+  function newRound() {
+    let pool = studyable();
+    if (!settings.includeKnown) pool = pool.filter(t => !known.has(t.term));
+    deck = shuffle(pool.slice()); total = deck.length; learnedThisRound = 0;
+    $('doneArea').style.display = 'none';
+    if (!total) {
+      $('studyArea').style.display = 'none'; $('doneArea').style.display = '';
+      $('doneTitle').textContent = studyable().length ? '🎉 Você já sabe todas!' : 'Nenhuma palavra selecionada';
+      $('doneText').textContent = studyable().length
+        ? 'Todas as palavras selecionadas estão marcadas como "já sei". Ative "Incluir palavras que já sei" ou zere o progresso.'
+        : 'Vá em "Escolher palavras" para selecionar o que estudar.';
+      return;
+    }
+    $('studyArea').style.display = 'flex';
+    next();
+  }
+
+  function next() {
+    const card = $('card');
+    card.className = 'card';
+    if (!deck.length) {
+      $('studyArea').style.display = 'none'; $('doneArea').style.display = '';
+      $('doneTitle').textContent = '🎉 Rodada concluída!';
+      $('doneText').textContent = 'Você passou por ' + total + ' cards. Quer começar outra rodada embaralhada?';
+      return;
+    }
+    current = deck.shift();
+    const front = settings.reverse ? current.meaning : current.term;
+    const back = settings.reverse ? current.term : current.meaning;
+    $('frontLabel').textContent = settings.reverse ? 'Significado' : 'Termo';
+    $('backLabel').textContent = settings.reverse ? 'Termo' : 'Significado';
+    $('frontText').textContent = front || '(sem definição na planilha)';
+    $('backText').textContent = back || '(sem definição na planilha)';
+    $('frontNum').textContent = $('backNum').textContent = '#' + current.id;
+    $('frontCat').textContent = current.category || '';
+    const extra = $('backExtra'); extra.innerHTML = '';
+    [['Categoria', current.category], ['Onde aparece no projeto', current.where], ['Exemplo', current.example]].forEach(p => {
+      if (!p[1]) return;
+      const d = document.createElement('div'); const b = document.createElement('b'); b.textContent = p[0];
+      d.appendChild(b); d.appendChild(document.createTextNode(p[1])); extra.appendChild(d);
+    });
+    updateStats();
+  }
+
+  function updateStats() {
+    const remaining = deck.length + 1;
+    $('statLeft').textContent = remaining + ' restante' + (remaining === 1 ? '' : 's') + ' de ' + total;
+    const sel = studyable();
+    const k = sel.filter(t => known.has(t.term)).length;
+    $('statKnown').textContent = k + '/' + sel.length + ' dominadas';
+    $('barFill').style.width = (total ? (learnedThisRound / total) * 100 : 0) + '%';
+  }
+
+  function flip() { $('card').classList.toggle('flipped'); }
+
+  function answer(isKnown) {
+    if (!current) return;
+    const card = $('card');
+    const c = current; current = null;
+    if (isKnown) {
+      learnedThisRound++;
+      if (!known.has(c.term)) { known.add(c.term); call('setKnown', c.term, true).catch(() => toast('Não consegui salvar o progresso')); }
+      card.classList.add('swipe-right');
+    } else {
+      if (known.has(c.term)) { known.delete(c.term); call('setKnown', c.term, false).catch(() => {}); }
+      // volta para o baralho algumas posições à frente
+      const pos = Math.min(deck.length, 3 + Math.floor(Math.random() * 4));
+      deck.splice(pos, 0, c);
+      card.classList.add('swipe-left');
+    }
+    setTimeout(next, 230);
+  }
+
+  function skip() { if (!current) return; deck.push(current); current = null; $('card').classList.add('swipe-left'); setTimeout(next, 230); }
+
+  // gestos: toque vira, arrastar para os lados responde
+  (function gestures() {
+    const scene = $('scene'); let x0 = null, y0 = null, moved = false;
+    scene.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; moved = false; }, { passive: true });
+    scene.addEventListener('touchmove', e => { if (x0 !== null && Math.abs(e.touches[0].clientX - x0) > 10) moved = true; }, { passive: true });
+    scene.addEventListener('touchend', e => {
+      if (x0 === null) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+      if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy)) { answer(dx > 0); }
+    });
+    $('card').addEventListener('click', () => { if (!moved) flip(); moved = false; });
+  })();
+
+  document.addEventListener('keydown', e => {
+    if (!$('view-study').classList.contains('active') || e.target.tagName === 'INPUT') return;
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); }
+    else if (e.key === 'ArrowRight') answer(true);
+    else if (e.key === 'ArrowLeft') answer(false);
+  });
+
+  $('knowBtn').onclick = () => answer(true);
+  $('againBtn').onclick = () => answer(false);
+  $('skipBtn').onclick = skip;
+  $('shuffleBtn').onclick = () => { newRound(); toast('Baralho embaralhado'); };
+  $('restartBtn').onclick = newRound;
+  $('refreshBtn').onclick = () => load(true);
+
+  // ---------- Abas ----------
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
+  function showView(v) {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
+    if (v === 'settings') openSettings();
+  }
+
+  // ---------- Configurações ----------
+  function openSettings() {
+    if (!settings) return;
+    draft = JSON.parse(JSON.stringify(settings));
+    if (!draft.custom.length) draft.custom = selectedTerms(Object.assign({}, draft, { mode: 'range' })).map(t => t.term);
+    document.querySelectorAll('input[name=mode]').forEach(r => r.checked = r.value === draft.mode);
+    $('fromInput').value = draft.from; $('toInput').value = draft.to;
+    $('reverseInput').checked = draft.reverse; $('includeKnownInput').checked = draft.includeKnown;
+    $('skipEmptyInput').checked = draft.skipEmpty !== false;
+    $('searchInput').value = '';
+    renderCatChips();
+    renderSettings();
+  }
+
+  function renderSettings() {
+    $('rangeBox').style.display = draft.mode === 'range' ? '' : 'none';
+    $('customBox').style.display = draft.mode === 'custom' ? '' : 'none';
+    const r = selectedTerms(Object.assign({}, draft, { mode: 'range' }));
+    const empty = r.filter(t => !t.meaning).length;
+    $('rangeInfo').textContent = r.length + ' palavras no intervalo (a planilha tem ' + terms.length + ')' +
+      (empty ? ', ' + empty + ' ainda sem definição' : '') + '. Novas linhas dentro do intervalo entram automaticamente.';
+    $('knownInfo').textContent = known.size + ' palavras marcadas como "já sei".';
+    if (draft.mode === 'custom') renderList();
+  }
+
+  function visibleTerms() {
+    const q = $('searchInput').value.trim().toLowerCase();
+    return q ? terms.filter(t => [t.term, t.meaning, t.category].join(' ').toLowerCase().includes(q)) : terms;
+  }
+
+  function renderCatChips() {
+    const box = $('catChips'); box.innerHTML = '';
+    const counts = {};
+    terms.forEach(t => { const c = t.category || 'Sem categoria'; counts[c] = (counts[c] || 0) + 1; });
+    Object.keys(counts).sort().forEach(c => {
+      const b = document.createElement('button'); b.className = 'chip'; b.textContent = '+ ' + c + ' (' + counts[c] + ')';
+      b.onclick = () => {
+        const s = new Set(draft.custom);
+        terms.forEach(t => { if ((t.category || 'Sem categoria') === c) s.add(t.term); });
+        draft.custom = [...s]; renderList(); toast('Marcadas: ' + c);
+      };
+      box.appendChild(b);
+    });
+  }
+
+  function renderList() {
+    const set = new Set(draft.custom);
+    const list = $('termList'); list.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    visibleTerms().forEach(t => {
+      const el = document.createElement('label'); el.className = 'item';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = set.has(t.term);
+      cb.onchange = () => { const s = new Set(draft.custom); cb.checked ? s.add(t.term) : s.delete(t.term); draft.custom = [...s]; updateCustomInfo(); };
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = t.id;
+      const box = document.createElement('div');
+      const tt = document.createElement('div'); tt.className = 't'; tt.textContent = t.term;
+      if (known.has(t.term)) { const k = document.createElement('span'); k.className = 'k'; k.textContent = '  ✓ sei'; tt.appendChild(k); }
+      const mm = document.createElement('div'); mm.className = 'm'; mm.textContent = t.meaning || '(sem definição)';
+      box.append(tt, mm); el.append(cb, n, box); frag.appendChild(el);
+    });
+    list.appendChild(frag);
+    updateCustomInfo();
+  }
+  function updateCustomInfo() {
+    const valid = new Set(terms.map(t => t.term));
+    $('customInfo').textContent = draft.custom.filter(x => valid.has(x)).length + ' de ' + terms.length + ' palavras marcadas.';
+  }
+
+  document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => { draft.mode = r.value; renderSettings(); });
+  $('fromInput').oninput = () => { draft.from = parseInt($('fromInput').value, 10) || 1; renderSettings(); };
+  $('toInput').oninput = () => { draft.to = parseInt($('toInput').value, 10) || 1; renderSettings(); };
+  document.querySelectorAll('[data-range]').forEach(c => c.onclick = () => {
+    const v = c.dataset.range;
+    if (v === 'all') { draft.from = 1; draft.to = Math.max(1, terms.length); }
+    else { const p = v.split('-'); draft.from = +p[0]; draft.to = +p[1]; }
+    $('fromInput').value = draft.from; $('toInput').value = draft.to; renderSettings();
+  });
+  $('searchInput').oninput = renderList;
+  $('selVisible').onclick = () => { const s = new Set(draft.custom); visibleTerms().forEach(t => s.add(t.term)); draft.custom = [...s]; renderList(); };
+  $('unselVisible').onclick = () => { const v = new Set(visibleTerms().map(t => t.term)); draft.custom = draft.custom.filter(x => !v.has(x)); renderList(); };
+  $('fromRange').onclick = () => { draft.custom = selectedTerms(Object.assign({}, draft, { mode: 'range' })).map(t => t.term); renderList(); toast('Copiado: palavras ' + draft.from + '–' + draft.to); };
+  $('reverseInput').onchange = () => draft.reverse = $('reverseInput').checked;
+  $('includeKnownInput').onchange = () => draft.includeKnown = $('includeKnownInput').checked;
+  $('skipEmptyInput').onchange = () => draft.skipEmpty = $('skipEmptyInput').checked;
+  $('resetKnownBtn').onclick = () => {
+    if (!confirm('Zerar todas as marcações de "já sei"?')) return;
+    call('resetKnown').then(() => { known = new Set(); renderSettings(); toast('Progresso zerado'); });
+  };
+  $('saveBtn').onclick = () => {
+    const btn = $('saveBtn'); btn.disabled = true; btn.textContent = 'Salvando…';
+    call('saveSettings', draft).then(s => {
+      settings = s; btn.disabled = false; btn.textContent = 'Salvar e estudar';
+      showView('study'); newRound(); toast(studyable().length + ' palavras no baralho');
+    }).catch(e => { btn.disabled = false; btn.textContent = 'Salvar e estudar'; toast('Erro ao salvar: ' + (e.message || e)); });
+  };
+
+  load(false);
+})();
+</script>
+</body>
+</html>
